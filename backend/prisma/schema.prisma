@@ -1,0 +1,171 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum AssignmentType {
+  INDIVIDUAL
+  MULTIPLE
+  DEPARTMENT
+  POSITION
+  ALL
+}
+
+// Development employee model - ready to be mapped to the team's central User/Employee model during integration
+model Employee {
+  id          String   @id @default(uuid())
+  employeeId  String   @unique // EMP001, EMP002, etc.
+  fullName    String
+  email       String   @unique
+  phone       String?
+  department  String   // IT, HR, Sales, Operations
+  designation String   // Senior Software Engineer, HR Executive, etc.
+  position    String   // Software Developer, HR Executive, etc.
+  status      String   @default("ACTIVE")
+  joiningDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments   TaskAssignment[]
+  comments      TaskComment[]
+  historyLogs   TaskHistory[]
+  notifications Notification[]
+
+  @@index([employeeId])
+  @@index([department])
+  @@index([position])
+}
+
+model Task {
+  id             String         @id @default(uuid())
+  title          String
+  description    String         @db.Text
+  category       String         @default("General")
+  priority       Priority       @default(MEDIUM)
+  status         TaskStatus     @default(PENDING)
+  deadline       DateTime
+  estimatedHours Float          @default(0)
+  assignmentType AssignmentType @default(INDIVIDUAL)
+  targetValue    String?
+  attachmentUrl  String?
+  tags           String?
+  createdBy      String         // EMP001 or "Admin"
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  assignments TaskAssignment[]
+  comments    TaskComment[]
+  history     TaskHistory[]
+
+  @@index([priority])
+  @@index([status])
+  @@index([deadline])
+  @@index([createdBy])
+}
+
+model TaskAssignment {
+  id          String     @id @default(uuid())
+  taskId      String
+  employeeId  String
+  status      TaskStatus @default(PENDING)
+  progress    Int        @default(0) // 0, 25, 50, 75, 100
+  assignedAt  DateTime   @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime   @updatedAt
+
+  task     Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  comments TaskComment[]
+
+  @@unique([taskId, employeeId])
+  @@index([employeeId])
+  @@index([status])
+}
+
+model TaskHistory {
+  id          String      @id @default(uuid())
+  taskId      String
+  employeeId  String?
+  action      String
+  oldStatus   TaskStatus?
+  newStatus   TaskStatus?
+  description String
+  createdAt   DateTime    @default(now())
+
+  task     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [employeeId], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([createdAt])
+}
+
+model TaskComment {
+  id               String   @id @default(uuid())
+  taskId           String
+  taskAssignmentId String?
+  employeeId       String
+  authorName       String
+  comment          String   @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  assignment TaskAssignment? @relation(fields: [taskAssignmentId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([employeeId])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String
+  title       String
+  message     String   @db.Text
+  type        String   @default("INFO")
+  link        String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  employee Employee @relation(fields: [recipientId], references: [employeeId], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([isRead])
+}
+
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  message     String    @db.Text
+  audience    String    @default("ALL")
+  targetValue String?
+  publishDate DateTime  @default(now())
+  expiryDate  DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([audience])
+  @@index([publishDate])
+}
