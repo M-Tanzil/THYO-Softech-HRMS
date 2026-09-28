@@ -584,6 +584,8 @@ model Payroll {
 
   deductions PayrollDeduction[]
 
+  @@unique([employeeId, month, year])
+
   @@map("payroll")
 }
 
