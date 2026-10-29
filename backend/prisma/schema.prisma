@@ -162,20 +162,24 @@ model Company {
 }
 
 model Branch {
-  id        String   @id @default(uuid()) @db.Uuid
-  companyId String   @map("company_id") @db.Uuid
-  name      String
-  code      String   @unique
-  logo      String?
-  address   String?
-  city      String?
-  state     String?
-  country   String?
-  phone     String?
-  email     String?
-  status    String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid()) @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  name                String
+  code                String   @unique
+  logo                String?
+  address             String?
+  city                String?
+  state               String?
+  country             String?
+  phone               String?
+  email               String?
+  latitude            Decimal? @db.Decimal(10, 7)
+  longitude           Decimal? @db.Decimal(10, 7)
+  allowedRadiusMeters Int      @default(100) @map("allowed_radius_meters")
+  timezone            String   @default("Asia/Kolkata")
+  status              String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -234,45 +238,51 @@ model Designation {
 }
 
 model Shift {
-  id           String   @id @default(uuid()) @db.Uuid
-  companyId    String   @map("company_id") @db.Uuid
-  branchId     String   @map("branch_id") @db.Uuid
-  name         String
-  startTime    DateTime @map("start_time") @db.Time(0)
-  endTime      DateTime @map("end_time") @db.Time(0)
-  graceMinutes Int?     @map("grace_minutes")
-  regularHours Decimal? @map("regular_hours") @db.Decimal(5, 2)
-  status       String?
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  branchId      String   @map("branch_id") @db.Uuid
+  name          String
+  startTime     DateTime @map("start_time") @db.Time(0)
+  endTime       DateTime @map("end_time") @db.Time(0)
+  graceMinutes  Int?     @map("grace_minutes")
+  regularHours  Decimal? @map("regular_hours") @db.Decimal(5, 2)
+  weeklyOffDays String[] @default(["SUNDAY"]) @map("weekly_off_days")
+  status        String?
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   attendance Attendance[]
+  employees  Employee[]
 }
 
 model Employee {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @unique @map("user_id") @db.Uuid
-  companyId         String    @map("company_id") @db.Uuid
-  branchId          String    @map("branch_id") @db.Uuid
-  departmentId      String    @map("department_id") @db.Uuid
-  designationId     String    @map("designation_id") @db.Uuid
-  managerId         String?   @map("manager_id") @db.Uuid
-  employeeCode      String    @unique @map("employee_code")
-  firstName         String    @map("first_name")
-  lastName          String?   @map("last_name")
-  profileImage      String?   @map("profile_image")
-  phone             String?
-  email             String?
-  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
-  dateOfJoining     DateTime? @map("date_of_joining") @db.Date
-  employmentStatus  String?   @map("employment_status")
-  documentsVerified Boolean   @default(false) @map("documents_verified")
-  address           String?
-  emergencyContact  String?   @map("emergency_contact")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  companyId            String    @map("company_id") @db.Uuid
+  branchId             String    @map("branch_id") @db.Uuid
+  departmentId         String    @map("department_id") @db.Uuid
+  designationId        String    @map("designation_id") @db.Uuid
+  managerId            String?   @map("manager_id") @db.Uuid
+  employeeCode         String    @unique @map("employee_code")
+  firstName            String    @map("first_name")
+  lastName             String?   @map("last_name")
+  profileImage         String?   @map("profile_image")
+  phone                String?
+  taxRegime            String    @default("NEW")
+  email                String?
+  shiftId              String?   @map("shift_id") @db.Uuid
+  shift                Shift?    @relation(fields: [shiftId], references: [id])
+  dateOfBirth          DateTime? @map("date_of_birth") @db.Date
+  dateOfJoining        DateTime? @map("date_of_joining") @db.Date
+  employmentStatus     String?   @map("employment_status")
+  documentsVerified    Boolean   @default(false) @map("documents_verified")
+  address              String?
+  emergencyContact     String?   @map("emergency_contact")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  wfhAttendanceEnabled Boolean   @default(false) @map("wfh_attendance_enabled")
 
   user User @relation(fields: [userId], references: [id])
 
@@ -288,12 +298,11 @@ model Employee {
 
   subordinates Employee[] @relation("EmployeeManager")
 
-  branchHistory EmployeeBranchHistory[] @relation("EmployeeBranchHistoryEmployee")
-
-  attendance Attendance[]
-
-  attendanceLogs AttendanceLog[]
-
+  branchHistory         EmployeeBranchHistory[]     @relation("EmployeeBranchHistoryEmployee")
+  wfhVerifications      WfhAttendanceVerification[]
+  attendance            Attendance[]
+  lunchBreaks           AttendanceLunchBreak[]
+  attendanceLogs        AttendanceLog[]
   attendanceAdjustments AttendanceAdjustment[]
 
   overtimeRecords OvertimeRecord[]
@@ -367,12 +376,16 @@ model Attendance {
 
   shift Shift @relation(fields: [shiftId], references: [id])
 
-  logs AttendanceLog[]
+  workMode         String                      @default("OFFICE") @map("work_mode")
+  lunchBreaks      AttendanceLunchBreak[]
+  wfhVerifications WfhAttendanceVerification[]
+  logs             AttendanceLog[]
 
   adjustments AttendanceAdjustment[]
 
   overtimeRecords OvertimeRecord[]
 
+  @@unique([employeeId, attendanceDate])
   @@map("attendance")
 }
 
@@ -425,11 +438,13 @@ model AttendancePolicy {
   lateThresholdMinutes   Int     @map("late_threshold_minutes")
   halfDayHours           Decimal @map("half_day_hours") @db.Decimal(5, 2)
   fullDayHours           Decimal @map("full_day_hours") @db.Decimal(5, 2)
+  lunchBreakMinutes      Int     @default(30) @map("lunch_break_minutes")
   overtimeEnabled        Boolean @map("overtime_enabled")
   overtimeThresholdHours Decimal @map("overtime_threshold_hours") @db.Decimal(5, 2)
   status                 String
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  wfhVerificationIntervalMinutes Int     @default(15) @map("wfh_verification_interval_minutes")
+  company                        Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
@@ -584,6 +599,7 @@ model Payroll {
 
   deductions PayrollDeduction[]
 
+  @@unique([employeeId, month, year])
   @@map("payroll")
 }
 
@@ -1249,4 +1265,42 @@ model AuditLog {
   branch Branch @relation(fields: [branchId], references: [id])
 
   @@map("audit_logs")
+}
+
+model AttendanceLunchBreak {
+  id              String    @id @default(uuid()) @db.Uuid
+  attendanceId    String    @map("attendance_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  startedAt       DateTime  @default(now()) @map("started_at")
+  scheduledEndAt  DateTime  @map("scheduled_end_at")
+  durationMinutes Int       @map("duration_minutes")
+  overrunMinutes  Int       @default(0) @map("overrun_minutes")
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  endedAt         DateTime? @map("ended_at")
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, attendanceId])
+  @@map("attendance_lunch_breaks")
+}
+
+model WfhAttendanceVerification {
+  id           String    @id @default(uuid()) @db.Uuid
+  attendanceId String    @map("attendance_id") @db.Uuid
+  employeeId   String    @map("employee_id") @db.Uuid
+  promptNumber Int       @map("prompt_number")
+  promptedAt   DateTime  @map("prompted_at")
+  respondedAt  DateTime? @map("responded_at")
+  status       String    @default("PENDING")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId, promptedAt])
+  @@index([employeeId, status])
+  @@map("wfh_attendance_verifications")
 }
