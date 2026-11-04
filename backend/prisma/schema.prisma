@@ -283,7 +283,7 @@ model Employee {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
   wfhAttendanceEnabled Boolean   @default(false) @map("wfh_attendance_enabled")
-
+  overtimeEnabled      Boolean   @default(false) @map("overtime_enabled")
   user User @relation(fields: [userId], references: [id])
 
   company Company @relation(fields: [companyId], references: [id])
