@@ -112,6 +112,7 @@ function AdminSidebar({
 
   return (
     <>
+      {/* Mobile overlay */}
       {mobileOpen && (
         <button
           type="button"
@@ -121,6 +122,7 @@ function AdminSidebar({
         />
       )}
 
+      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col overflow-hidden border-r border-indigo-300/10 bg-gradient-to-b from-[#171936] via-[#10152d] to-[#090d1d] shadow-2xl shadow-slate-950/30 transition-all duration-300
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
@@ -154,6 +156,7 @@ function AdminSidebar({
             )}
           </div>
 
+          {/* Desktop collapse */}
           <button
             type="button"
             onClick={onToggle}
@@ -170,6 +173,7 @@ function AdminSidebar({
             )}
           </button>
 
+          {/* Mobile close */}
           <button
             type="button"
             onClick={onMobileClose}
@@ -206,6 +210,7 @@ function AdminSidebar({
 
         {/* Footer */}
         <div className="shrink-0 border-t border-white/[0.08] p-3">
+          {/* Admin Portal */}
           <div
             className={`flex items-center gap-3 rounded-xl border border-white/[0.06] bg-gradient-to-r from-indigo-500/[0.10] to-purple-500/[0.10] p-3 ${
               collapsed ? "justify-center" : ""
@@ -227,6 +232,7 @@ function AdminSidebar({
             )}
           </div>
 
+          {/* Logout */}
           <button
             type="button"
             onClick={handleLogout}

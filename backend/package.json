@@ -12,6 +12,7 @@
     "prisma:seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.0",
     "bcrypt": "latest",
     "cors": "latest",
@@ -21,9 +22,11 @@
     "jsonwebtoken": "latest",
     "morgan": "latest",
     "multer": "latest",
+    "pg": "^8.23.1",
     "zod": "latest"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "latest",
     "nodemon": "latest",
     "prisma": "^7.10.0"
