@@ -70,9 +70,7 @@ function SidebarItem({ item, collapsed, onMobileClose }) {
       {!collapsed && <span className="truncate">{item.label}</span>}
 
       {!collapsed && (
-        <span className="ml-auto text-lg leading-none opacity-0 transition-opacity group-hover:opacity-70">
-          ›
-        </span>
+        <ChevronRight className="ml-auto h-4 w-4 opacity-0 transition-opacity group-hover:opacity-70" />
       )}
     </NavLink>
   );
@@ -131,15 +129,19 @@ function AdminSidebar({
         lg:translate-x-0 lg:max-w-none lg:transition-[width]
         ${collapsed ? "lg:w-20" : "lg:w-64"}`}
       >
-        {/* Brand */}
+        {/* Brand with THYO Softtech Logo */}
         <div
-          className={`flex h-20 shrink-0 items-center border-b border-white/[0.08] ${
+          className={`relative flex h-20 shrink-0 items-center border-b border-white/[0.08] ${
             collapsed ? "justify-center px-2" : "justify-between px-4"
           }`}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-lg font-black text-white shadow-lg shadow-violet-900/40 ring-1 ring-white/20">
-              T
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-lg shadow-black/20 ring-1 ring-white/20">
+              <img
+                src="/thyo-logo.jpeg"
+                alt="THYO Softtech Logo"
+                className="h-full w-full object-contain"
+              />
             </div>
 
             {!collapsed && (
@@ -240,7 +242,6 @@ function AdminSidebar({
             }`}
           >
             <LogOut className="h-5 w-5 shrink-0" />
-
             {!collapsed && <span>Logout</span>}
           </button>
         </div>
