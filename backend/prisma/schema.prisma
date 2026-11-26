@@ -28,6 +28,8 @@ model User {
   attendanceAdjustmentsApproved AttendanceAdjustment[] @relation("AttendanceAdjustmentApprovedBy")
 
   overtimeRecordsApproved OvertimeRecord[] @relation("OvertimeApprovedBy")
+  overtimeRequestsSubmitted OvertimeRequest[] @relation("OvertimeRequestSubmitter")
+  overtimeRequestsReviewed  OvertimeRequest[] @relation("OvertimeRequestReviewer")
 
   leaveRequestsApproved LeaveRequest[] @relation("LeaveRequestApprover")
 
@@ -306,6 +308,7 @@ model Employee {
   attendanceAdjustments AttendanceAdjustment[]
 
   overtimeRecords OvertimeRecord[]
+  overtimeRequests OvertimeRequest[]
 
   leaveBalances LeaveBalance[]
   leaveRequests LeaveRequest[]
@@ -459,6 +462,7 @@ model OvertimeRecord {
   regularHours  Decimal   @map("regular_hours") @db.Decimal(5, 2)
   actualHours   Decimal   @map("actual_hours") @db.Decimal(5, 2)
   overtimeHours Decimal   @map("overtime_hours") @db.Decimal(5, 2)
+  rejectionReason String? @map("rejection_reason")
   status        String
   approvedBy    String?   @map("approved_by") @db.Uuid
   approvedAt    DateTime? @map("approved_at")
@@ -471,6 +475,34 @@ model OvertimeRecord {
   approvedByUser User? @relation("OvertimeApprovedBy", fields: [approvedBy], references: [id])
 
   @@map("overtime_records")
+}
+model OvertimeRequest {
+  id              String    @id @default(uuid()) @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  submittedBy     String    @map("submitted_by") @db.Uuid
+  requesterRole   String    @map("requester_role")
+  overtimeDate    DateTime  @map("overtime_date") @db.Date
+  requestedHours  Decimal   @map("requested_hours") @db.Decimal(5, 2)
+  approvedHours   Decimal?  @map("approved_hours") @db.Decimal(5, 2)
+  reason          String
+  status          String    @default("PENDING")
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at")
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  submitter User @relation("OvertimeRequestSubmitter", fields: [submittedBy], references: [id])
+
+  reviewer User? @relation("OvertimeRequestReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([employeeId, status])
+  @@index([submittedBy])
+  @@index([reviewedBy])
+  @@index([overtimeDate])
+  @@map("overtime_requests")
 }
 
 model LeaveType {

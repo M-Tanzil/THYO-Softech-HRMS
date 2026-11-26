@@ -89,6 +89,13 @@ function EmployeeLayout() {
       active: true,
     },
     {
+  name: "My Overtime",
+  path: "/employee/overtime",
+  icon: Clock,
+  section: "My Workspace",
+  active: true,
+},
+    {
       name: "My Leave",
       path: "/employee/leave",
       icon: CalendarClock,

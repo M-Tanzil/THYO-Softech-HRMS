@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { getCurrentUser } from "../../services/storage/currentUser";
+import { clearTokens } from "../../services/storage/authStorage";
 import {
   LayoutDashboard,
   UsersRound,
@@ -69,11 +70,9 @@ function ManagerLayout() {
   }, []);
 
   const handleLogout = () => {
-    // Preserve the project's existing logout behavior.
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    window.location.href = "/login";
-  };
+  clearTokens();
+  window.location.href = "/login";
+};
 
   const menuItems = [
     {
@@ -94,6 +93,12 @@ function ManagerLayout() {
       icon: CalendarCheck,
       section: "Workspace",
     },
+    {
+  name: "Overtime",
+  path: "/manager/overtime",
+  icon: Clock,
+  section: "Workspace",
+},
     {
       name: "Leave Requests",
       path: "/manager/leave",

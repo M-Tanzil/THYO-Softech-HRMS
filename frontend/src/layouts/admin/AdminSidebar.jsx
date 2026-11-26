@@ -28,6 +28,7 @@ const mainItems = [
   { label: "Employees", icon: UsersRound, path: "/admin/employees" },
   { label: "Attendance", icon: CalendarCheck, path: "/admin/attendance" },
   { label: "Leave", icon: CalendarClock, path: "/admin/leave" },
+  { label: "Overtime", icon: Clock4, path: "/admin/overtime" },
 ];
 
 const organizationItems = [
