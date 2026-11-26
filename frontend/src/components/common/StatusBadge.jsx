@@ -9,12 +9,12 @@ const STATUS_CONFIG = {
   },
   IN_PROGRESS: {
     label: 'In Progress',
-    bg: 'bg-sky-50 text-sky-700 border-sky-200',
+    bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     icon: PlayCircle
   },
   ON_HOLD: {
     label: 'On Hold',
-    bg: 'bg-purple-50 text-purple-700 border-purple-200',
+    bg: 'bg-violet-50 text-violet-700 border-violet-200',
     icon: PauseCircle
   },
   COMPLETED: {

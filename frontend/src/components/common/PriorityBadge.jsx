@@ -4,12 +4,12 @@ import { ArrowDown, Minus, ArrowUp, AlertTriangle } from 'lucide-react';
 const PRIORITY_CONFIG = {
   LOW: {
     label: 'Low',
-    bg: 'bg-slate-100 text-slate-700 border-slate-200',
+    bg: 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0]',
     icon: ArrowDown
   },
   MEDIUM: {
     label: 'Medium',
-    bg: 'bg-blue-50 text-blue-700 border-blue-200',
+    bg: 'bg-[#E0F2FE] text-[#1E40AF] border-[#BAE6FD]',
     icon: Minus
   },
   HIGH: {

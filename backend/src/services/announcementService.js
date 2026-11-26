@@ -1,102 +1,119 @@
-const prisma = require('../config/prisma');
+const announcementRepository = require('../repositories/announcementRepository');
 const notificationService = require('./notificationService');
+const prisma = require('../config/prisma');
+const { normalizeCalendarDate } = require('../utils/dateUtils');
 
 class AnnouncementService {
   async createAnnouncement(data, creator) {
     const {
       title,
       message,
-      audience = 'ALL',
-      targetValue = null,
-      expiryDate = null
+      priority = 'NORMAL',
+      category = 'GENERAL',
+      publishDate = null,
+      expiryDate = null,
+      targets = []
     } = data;
 
-    const announcement = await prisma.announcement.create({
-      data: {
-        title,
-        message,
-        audience: audience.toUpperCase(),
-        targetValue,
-        publishDate: new Date(),
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
-        createdById: creator.employeeId || 'EMP001'
-      }
-    });
-
-    let targetEmployees = [];
-    const aud = audience.toUpperCase();
-
-    if (aud === 'ALL') {
-      targetEmployees = await prisma.employee.findMany({
-        where: { status: 'ACTIVE' },
-        select: { employeeId: true }
-      });
-    } else if (aud === 'DEPARTMENT' && targetValue) {
-      targetEmployees = await prisma.employee.findMany({
-        where: { department: { equals: targetValue, mode: 'insensitive' }, status: 'ACTIVE' },
-        select: { employeeId: true }
-      });
-    } else if (aud === 'POSITION' && targetValue) {
-      targetEmployees = await prisma.employee.findMany({
-        where: {
-          OR: [
-            { position: { equals: targetValue, mode: 'insensitive' } },
-            { designation: { equals: targetValue, mode: 'insensitive' } }
-          ],
-          status: 'ACTIVE'
-        },
-        select: { employeeId: true }
-      });
-    } else if (aud === 'INDIVIDUAL' && targetValue) {
-      targetEmployees = [{ employeeId: targetValue }];
+    let normPublish = publishDate ? normalizeCalendarDate(publishDate)?.date : null;
+    let normExpiry = expiryDate ? normalizeCalendarDate(expiryDate)?.date : null;
+    if (normPublish && normExpiry && normPublish > normExpiry) {
+      const error = new Error('Publish date cannot be after expiry date.');
+      error.statusCode = 400;
+      throw error;
     }
 
-    if (targetEmployees.length > 0) {
-      const ids = targetEmployees.map(e => e.employeeId);
-      await notificationService.createBulkNotifications(ids, {
-        title: `Announcement: ${title}`,
-        message: message.length > 100 ? message.substring(0, 97) + '...' : message,
-        type: 'ANNOUNCEMENT',
-        link: '/announcements'
-      });
+    // Ensure targets array is formed
+    let normalizedTargets = targets;
+    if (!normalizedTargets || normalizedTargets.length === 0) {
+      if (data.audience) {
+        normalizedTargets = [{ targetType: data.audience.toUpperCase(), targetValue: data.targetValue || null }];
+      } else {
+        normalizedTargets = [{ targetType: 'ALL', targetValue: null }];
+      }
+    }
+
+    const announcement = await announcementRepository.createAnnouncement(
+      {
+        id: data.id,
+        title,
+        message: message || data.content,
+        content: data.content || message,
+        date: data.date,
+        author: data.author || creator?.fullName || creator?.name,
+        authorRole: data.authorRole || creator?.role || creator?.designation,
+        authorAvatar: data.authorAvatar,
+        priority,
+        category,
+        targetDepartment: data.targetDepartment || 'All Organization',
+        pinned: data.pinned,
+        publishDate,
+        expiryDate,
+        acknowledgedBy: data.acknowledgedBy || (creator?.employeeId ? [creator.employeeId] : []),
+        createdById: creator?.employeeId || 'EMP001',
+        audience: normalizedTargets[0]?.targetType || 'ALL',
+        targetValue: normalizedTargets[0]?.targetValue || null
+      },
+      normalizedTargets
+    );
+
+    // Resolve target recipient employees for notification dispatch
+    try {
+      const recipientIds = new Set();
+
+      for (const target of normalizedTargets) {
+        if (target.targetType === 'ALL') {
+          const allEmployees = await prisma.employee.findMany({
+            where: { status: 'ACTIVE' },
+            select: { employeeId: true }
+          });
+          allEmployees.forEach(e => recipientIds.add(e.employeeId));
+          break; // Already includes everyone
+        } else if (target.targetType === 'DEPARTMENT' && target.targetValue) {
+          const deptEmployees = await prisma.employee.findMany({
+            where: { department: { equals: target.targetValue, mode: 'insensitive' }, status: 'ACTIVE' },
+            select: { employeeId: true }
+          });
+          deptEmployees.forEach(e => recipientIds.add(e.employeeId));
+        } else if (target.targetType === 'ROLE' && target.targetValue) {
+          const roleEmployees = await prisma.user.findMany({
+            where: { role: target.targetValue.toUpperCase(), isActive: true, employeeId: { not: null } },
+            select: { employeeId: true }
+          });
+          roleEmployees.forEach(u => u.employeeId && recipientIds.add(u.employeeId));
+        } else if (target.targetType === 'EMPLOYEE_GROUP' && target.targetValue) {
+          const ids = target.targetValue.split(',').map(s => s.trim());
+          ids.forEach(id => id && recipientIds.add(id));
+        }
+      }
+
+      if (recipientIds.size > 0) {
+        notificationService.notifyAnnouncement({
+          recipientIds: Array.from(recipientIds),
+          title,
+          message: message || data.content,
+          announcementId: announcement.id
+        }).catch(err => {
+          console.warn('Background notification error on announcement:', err.message);
+        });
+      }
+    } catch (err) {
+      console.error('Error resolving announcement recipients:', err.message);
     }
 
     return announcement;
   }
 
   async getAnnouncements(user = null) {
-    const now = new Date();
+    return await announcementRepository.getAnnouncements(user);
+  }
 
-    const where = {
-      OR: [
-        { expiryDate: null },
-        { expiryDate: { gte: now } }
-      ]
-    };
-
-    if (user && user.role !== 'ADMIN') {
-      where.AND = [
-        {
-          OR: [
-            { audience: 'ALL' },
-            { audience: 'DEPARTMENT', targetValue: { equals: user.department, mode: 'insensitive' } },
-            { audience: 'POSITION', targetValue: { equals: user.position, mode: 'insensitive' } },
-            { audience: 'INDIVIDUAL', targetValue: user.employeeId }
-          ]
-        }
-      ];
-    }
-
-    return await prisma.announcement.findMany({
-      where,
-      orderBy: { publishDate: 'desc' }
-    });
+  async acknowledgeAnnouncement(id, employeeId) {
+    return await announcementRepository.acknowledgeAnnouncement(id, employeeId);
   }
 
   async deleteAnnouncement(id) {
-    return await prisma.announcement.delete({
-      where: { id }
-    });
+    return await announcementRepository.deleteAnnouncement(id);
   }
 }
 

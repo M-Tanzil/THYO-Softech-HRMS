@@ -1,21 +1,24 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding THYO SOFTECH PVT LTD - HRMS Task Management Module Database...');
 
   // Clean existing tables (in correct foreign key order)
+  await prisma.auditLog.deleteMany({});
   await prisma.notification.deleteMany({});
   await prisma.taskComment.deleteMany({});
   await prisma.taskHistory.deleteMany({});
   await prisma.taskAssignment.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.announcement.deleteMany({});
+  await prisma.user.deleteMany({});
   await prisma.employee.deleteMany({});
 
   console.log('✓ Cleared previous development data');
 
-  // 1. Seed Required Development Employees
+  // 1. Seed Required Development Employees (8 Employees)
   const employeesData = [
     {
       employeeId: 'EMP001',
@@ -32,21 +35,21 @@ async function main() {
       employeeId: 'EMP002',
       fullName: 'MD TANZIL',
       email: 'md.tanzil@thyosoftech.com',
-      phone: '+91 98765 43211',
+      phone: '+91 98765 43213',
       department: 'HR',
       designation: 'HR Executive',
       position: 'HR Executive',
       status: 'ACTIVE',
-      joiningDate: new Date('2023-07-01')
+      joiningDate: new Date('2023-09-01')
     },
     {
       employeeId: 'EMP003',
       fullName: 'RIYA PRADHAN',
       email: 'riya.pradhan@thyosoftech.com',
       phone: '+91 98765 43212',
-      department: 'Operations',
-      designation: 'Operations Executive',
-      position: 'Operations Executive',
+      department: 'Sales',
+      designation: 'Sales Executive',
+      position: 'Sales Executive',
       status: 'ACTIVE',
       joiningDate: new Date('2023-08-10')
     },
@@ -54,12 +57,12 @@ async function main() {
       employeeId: 'EMP004',
       fullName: 'ANSUMAN GOUDA',
       email: 'ansuman.gouda@thyosoftech.com',
-      phone: '+91 98765 43213',
-      department: 'Sales',
-      designation: 'Sales Executive',
-      position: 'Sales Executive',
+      phone: '+91 98765 43211',
+      department: 'IT',
+      designation: 'Software Engineer',
+      position: 'Software Developer',
       status: 'ACTIVE',
-      joiningDate: new Date('2023-09-01')
+      joiningDate: new Date('2023-07-01')
     },
     {
       employeeId: 'EMP005',
@@ -71,6 +74,50 @@ async function main() {
       position: 'Software Developer',
       status: 'ACTIVE',
       joiningDate: new Date('2023-10-05')
+    },
+    {
+      employeeId: 'EMP006',
+      fullName: 'PUNIT MISHRA',
+      email: 'punit.mishra@thyosoftech.com',
+      phone: '+91 98765 43215',
+      department: 'Management',
+      designation: 'Super Administrator',
+      position: 'Head of Engineering / Super Admin',
+      status: 'ACTIVE',
+      joiningDate: new Date('2023-01-10')
+    },
+    {
+      employeeId: 'EMP009',
+      fullName: 'AMIT SHARMA',
+      email: 'amit.sharma@thyosoftech.com',
+      phone: '+91 98765 43218',
+      department: 'Operations',
+      designation: 'System Administrator',
+      position: 'Administrator',
+      status: 'ACTIVE',
+      joiningDate: new Date('2023-02-15')
+    },
+    {
+      employeeId: 'EMP007',
+      fullName: 'ARJUN MEHTA',
+      email: 'arjun.mehta@thyosoftech.com',
+      phone: '+91 98765 43216',
+      department: 'Sales',
+      designation: 'Sales Manager',
+      position: 'Manager',
+      status: 'ACTIVE',
+      joiningDate: new Date('2023-03-15')
+    },
+    {
+      employeeId: 'EMP008',
+      fullName: 'NEHA SHARMA',
+      email: 'neha.sharma@thyosoftech.com',
+      phone: '+91 98765 43217',
+      department: 'HR',
+      designation: 'HR Lead',
+      position: 'HR Manager',
+      status: 'ACTIVE',
+      joiningDate: new Date('2023-04-01')
     }
   ];
 
@@ -79,7 +126,114 @@ async function main() {
     const created = await prisma.employee.create({ data: emp });
     seededEmployees.push(created);
   }
-  console.log(`✓ Seeded ${seededEmployees.length} development employees (EMP001 to EMP005)`);
+  console.log(`✓ Seeded ${seededEmployees.length} development employees (EMP001 to EMP008)`);
+
+  // 1.5 Seed Real Users with BCRYPT Hashed Passwords
+  const adminPassword = await bcrypt.hash('Admin@12345', 10);
+  const managerPassword = await bcrypt.hash('Manager@12345', 10);
+  const hrPassword = await bcrypt.hash('Hr@12345', 10);
+  const employeePassword = await bcrypt.hash('Employee@12345', 10);
+
+  const usersData = [
+    {
+      username: 'rupam',
+      email: 'rupam.bhargov@thyosoftech.com',
+      passwordHash: employeePassword,
+      role: 'EMPLOYEE',
+      isActive: true,
+      employeeId: 'EMP001'
+    },
+    {
+      username: 'tanzil',
+      email: 'md.tanzil@thyosoftech.com',
+      passwordHash: employeePassword,
+      role: 'EMPLOYEE',
+      isActive: true,
+      employeeId: 'EMP002'
+    },
+    {
+      username: 'riya',
+      email: 'riya.pradhan@thyosoftech.com',
+      passwordHash: employeePassword,
+      role: 'EMPLOYEE',
+      isActive: true,
+      employeeId: 'EMP003'
+    },
+    {
+      username: 'anshuman',
+      email: 'ansuman.gouda@thyosoftech.com',
+      passwordHash: employeePassword,
+      role: 'EMPLOYEE',
+      isActive: true,
+      employeeId: 'EMP004'
+    },
+    {
+      username: 'santosh',
+      email: 'santosh.sen@thyosoftech.com',
+      passwordHash: employeePassword,
+      role: 'EMPLOYEE',
+      isActive: true,
+      employeeId: 'EMP005'
+    },
+    {
+      username: 'punit',
+      email: 'punit.mishra@thyosoftech.com',
+      passwordHash: adminPassword,
+      role: 'SUPER_ADMIN',
+      isActive: true,
+      employeeId: 'EMP006'
+    },
+    {
+      username: 'admin',
+      email: 'amit.sharma@thyosoftech.com',
+      passwordHash: adminPassword,
+      role: 'ADMIN',
+      isActive: true,
+      employeeId: 'EMP009'
+    },
+    {
+      username: 'arjun',
+      email: 'arjun.mehta@thyosoftech.com',
+      passwordHash: managerPassword,
+      role: 'MANAGER',
+      isActive: true,
+      employeeId: 'EMP007'
+    },
+    {
+      username: 'neha',
+      email: 'neha.sharma@thyosoftech.com',
+      passwordHash: hrPassword,
+      role: 'HR',
+      isActive: true,
+      employeeId: 'EMP008'
+    }
+  ];
+
+  for (const u of usersData) {
+    await prisma.user.create({ data: u });
+  }
+  console.log(`✓ Seeded ${usersData.length} authenticated users with bcrypt hashed passwords (ADMIN, HR, MANAGER, EMPLOYEE)`);
+
+  // 1.6 Seed Initial Audit Logs
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        employeeId: 'EMP001',
+        action: 'SYSTEM_INITIALIZATION',
+        entityType: 'SYSTEM',
+        entityId: 'SYSTEM',
+        details: 'Task management module initialized with secure PostgreSQL database schema and strict RBAC.'
+      },
+      {
+        employeeId: 'EMP001',
+        action: 'USER_PROVISIONED',
+        entityType: 'USER',
+        entityId: 'admin',
+        details: 'Administrator account provisioned for IT Department.'
+      }
+    ]
+  });
+  console.log('✓ Seeded system audit logs');
 
   // 2. Seed Realistic Sample Tasks
   const now = new Date();
@@ -116,14 +270,14 @@ async function main() {
             action: 'TASK_CREATED',
             oldStatus: null,
             newStatus: 'PENDING',
-            description: 'Task created and assigned to EMP004 (ANSUMAN GOUDA)'
+            description: 'Task created and assigned to EMP004 (ANSUMAN GO)'
           },
           {
             employeeId: 'EMP004',
             action: 'STATUS_UPDATED',
             oldStatus: 'PENDING',
             newStatus: 'IN_PROGRESS',
-            description: 'Ansuman Gouda started working on regional sales aggregation'
+            description: 'Ansuman Go started working on regional sales aggregation'
           },
           {
             employeeId: 'EMP004',
@@ -138,7 +292,7 @@ async function main() {
         create: [
           {
             employeeId: 'EMP004',
-            authorName: 'ANSUMAN GOUDA',
+            authorName: 'ANSUMAN GO',
             comment: 'North zone and South zone numbers are verified. Working on West region data.'
           }
         ]

@@ -12,7 +12,7 @@ export default function TaskCard({ task, isEmployeeView = false }) {
 
   // Determine deadline badge
   let deadlineText = `${diffDays} days left`;
-  let deadlineColor = 'text-slate-500';
+  let deadlineColor = 'text-[#64748B]';
 
   if (diffDays < 0) {
     deadlineText = `Overdue by ${Math.abs(diffDays)}d`;
@@ -37,11 +37,11 @@ export default function TaskCard({ task, isEmployeeView = false }) {
   return (
     <Link
       to={detailUrl}
-      className="group block bg-white rounded-xl border border-slate-200 p-5 hover:border-sky-300 hover:shadow-md transition-all duration-200"
+      className="group block bg-white rounded-xl border border-[#E2E8F0] p-5 hover:border-[#0084FF]/50 hover:shadow-md transition-all duration-200"
     >
       {/* Card Header: Category & Badges */}
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[#1E40AF] bg-[#F0F9FF] border border-[#BAE6FD]/60 px-2 py-0.5 rounded">
           {task.category || 'General'}
         </span>
         <div className="flex items-center gap-1.5">
@@ -51,10 +51,10 @@ export default function TaskCard({ task, isEmployeeView = false }) {
       </div>
 
       {/* Task Title & Description */}
-      <h3 className="text-base font-semibold text-slate-800 group-hover:text-sky-600 transition-colors line-clamp-1 mb-1.5">
+      <h3 className="text-base font-bold text-[#0F172A] group-hover:text-[#0084FF] transition-colors line-clamp-1 mb-1.5">
         {task.title}
       </h3>
-      <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+      <p className="text-xs text-[#64748B] line-clamp-2 mb-4 leading-relaxed">
         {task.description}
       </p>
 
@@ -64,7 +64,7 @@ export default function TaskCard({ task, isEmployeeView = false }) {
       </div>
 
       {/* Card Footer: Assignees, Deadline & Comments count */}
-      <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+      <div className="flex items-center justify-between pt-3 border-t border-[#E2E8F0] text-xs">
         {/* Assigned Employees */}
         <div className="flex items-center gap-1.5">
           {assignments.length > 0 ? (
@@ -73,7 +73,7 @@ export default function TaskCard({ task, isEmployeeView = false }) {
                 <div
                   key={a.id}
                   title={a.employee ? `${a.employee.fullName} (${a.employee.department})` : a.employeeId}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 ring-2 ring-white"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#E0F2FE] text-[10px] font-bold text-[#1E40AF] ring-2 ring-white"
                 >
                   {a.employee?.fullName
                     ? a.employee.fullName.split(' ').map(n => n[0]).join('').substring(0, 2)
@@ -81,20 +81,20 @@ export default function TaskCard({ task, isEmployeeView = false }) {
                 </div>
               ))}
               {assignments.length > 3 && (
-                <div className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 ring-2 ring-white">
+                <div className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#E2E8F0] text-[10px] font-bold text-[#64748B] ring-2 ring-white">
                   +{assignments.length - 3}
                 </div>
               )}
             </div>
           ) : (
-            <span className="text-slate-400 italic text-[11px]">Unassigned</span>
+            <span className="text-[#64748B] italic text-[11px]">Unassigned</span>
           )}
         </div>
 
         {/* Deadline info */}
         <div className="flex items-center gap-3">
           {task._count?.comments > 0 && (
-            <span className="flex items-center gap-1 text-slate-400">
+            <span className="flex items-center gap-1 text-[#64748B]">
               <MessageSquare className="w-3.5 h-3.5" />
               <span>{task._count.comments}</span>
             </span>

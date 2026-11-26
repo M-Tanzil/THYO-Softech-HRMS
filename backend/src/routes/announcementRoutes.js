@@ -2,23 +2,28 @@ const express = require('express');
 const router = express.Router();
 const announcementController = require('../controllers/announcementController');
 const { requireRole } = require('../middleware/authMiddleware');
-const { validateAnnouncement } = require('../middleware/validation');
+const { validateCreateAnnouncement } = require('../validators/announcementValidator');
 
-// Read announcements (available to all active employees and administrators)
+// Read announcements (available to all active employees and administrators, filtered by audience)
 router.get('/', announcementController.getAnnouncements);
 
-// Publishing announcements (strictly Admin / HR / Manager)
+// Publishing announcements (Admin only)
 router.post(
   '/',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
-  validateAnnouncement,
+  requireRole('ADMIN'),
+  validateCreateAnnouncement,
   announcementController.createAnnouncement
 );
 
-// Deleting announcements (strictly Admin / HR / Manager)
-router.delete(
+// Acknowledge announcement (All authenticated employees)
+router.post('/:id/acknowledge', announcementController.acknowledgeAnnouncement);
+router.patch('/:id/acknowledge', announcementController.acknowledgeAnnouncement);
+router.put('/:id/acknowledge', announcementController.acknowledgeAnnouncement);
+
+// Deleting announcements (Admin only)
+router.delete( 
   '/:id',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
+  requireRole('ADMIN'),
   announcementController.deleteAnnouncement
 );
 

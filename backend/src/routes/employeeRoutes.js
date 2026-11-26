@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const employeeController = require('../controllers/employeeController');
 
+router.get('/me', employeeController.getCurrentUser);
 router.get('/', employeeController.getEmployees);
 router.get('/meta', employeeController.getEmployeeMetadata);
 

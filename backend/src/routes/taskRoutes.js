@@ -11,45 +11,45 @@ const {
 
 // Specific sub-routes first
 router.get('/my', taskController.getMyTasks);
-router.get('/employee/:employeeId', requireRole('ADMIN', 'HR', 'MANAGER'), taskController.getEmployeeTasks);
+router.get('/employee/:employeeId', requireRole('ADMIN', 'MANAGER'), taskController.getEmployeeTasks);
 
-// Task Creation (Strictly Admin / HR / Manager)
+// Task Creation (Strictly Admin / Manager within authorized department)
 router.post(
   '/',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER'),
   validateCreateTask,
   taskController.createTask
 );
 
-// All Tasks (Supervisory list; regular employees automatically scoped in controller)
+// All Tasks (Supervisory list for Admin; automatically scoped for Manager and Employee)
 router.get('/', taskController.getTasks);
 
-// Single Task details (Guarded: Admin/HR/Manager can view all; Employee can only view assigned tasks)
+// Single Task details (Guarded: Admin view all; Manager within scope; Employee only assigned tasks)
 router.get('/:id', requireTaskAccess('view'), taskController.getTaskById);
 
-// Task Modification (Strictly Admin / HR / Manager)
+// Task Modification (Admin / Manager within authorized scope)
 router.put(
   '/:id',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER'),
   validateUpdateTask,
   taskController.updateTask
 );
 
-// Task Deletion (Strictly Admin / HR / Manager)
+// Task Deletion (Strictly reserved for ADMIN - Managers and Employees cannot delete tasks)
 router.delete(
   '/:id',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
+  requireRole('ADMIN'),
   taskController.deleteTask
 );
 
-// Task Reassignment / Assignment (Strictly Admin / HR / Manager)
+// Task Reassignment / Assignment (Admin / Manager within authorized scope)
 router.post(
   '/:id/assign',
-  requireRole('ADMIN', 'HR', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER'),
   taskController.assignTask
 );
 
-// Status and Progress Update (Admin/HR/Manager or the assigned Employee)
+// Status and Progress Update (Admin/Super Admin/Manager or the assigned Employee updating their own progress)
 router.patch(
   '/:id/status',
   requireTaskAccess('update status on'),
@@ -58,6 +58,12 @@ router.patch(
 );
 
 // Task Comments (Admin/HR/Manager or the assigned Employee)
+router.get(
+  '/:id/comments',
+  requireTaskAccess('view comments on'),
+  taskController.getComments
+);
+
 router.post(
   '/:id/comments',
   requireTaskAccess('comment on'),

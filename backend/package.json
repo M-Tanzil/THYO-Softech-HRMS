@@ -10,14 +10,23 @@
     "prisma:migrate": "npx prisma migrate dev --name init",
     "prisma:push": "npx prisma db push",
     "prisma:seed": "node prisma/seed.js",
-    "db:setup": "npx prisma db push && node prisma/seed.js"
+    "seed:users": "node prisma/seedUsers.js",
+    "update:roles": "node prisma/updateRolesAndEmployees.js",
+    "db:setup": "npx prisma db push && node prisma/seed.js",
+    "test:rbac": "node verifyRbacEndToEnd.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "morgan": "^1.10.0"
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.4.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.4",

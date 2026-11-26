@@ -174,7 +174,7 @@ At the top right of the application header, you will find the **User & Role Simu
    - Click **Create Task**, choose Assignment Type: `Department` -> `IT` or `Multiple Employees`, set priority and deadline, and submit.
    - Observe that the task is created in PostgreSQL, assignments are generated, and notifications are sent.
 2. **Testing Employee Workflow (Strict RBAC)**:
-   - Select User: `EMP003 - RIYA PRADHAN` or `EMP004 - ANSUMAN GOUDA`
+   - Select User: `EMP003 - RIYA PRADHAN` or `EMP004 - ANSUMAN GO`
    - Select Role: `EMPLOYEE`
    - Notice that **Task Administration** (Create Task, All Tasks, Reports) is completely hidden.
    - The employee sees **My Assigned Tasks**, **Notifications**, and **Announcements**.

@@ -1,6 +1,11 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 require('dotenv').config();
 const app = require('./app');
 const prisma = require('./config/prisma');
+const { warmUpCaches } = require('./config/cacheWarmup');
 
 const PORT = process.env.PORT || 5000;
 
@@ -8,15 +13,17 @@ async function startServer() {
   try {
     // Verify database connection on startup
     await prisma.$connect();
-    console.log('------------------------------------------------------------');
-    console.log('🏢 THYO SOFTECH PVT LTD - HRMS TASK MANAGEMENT SYSTEM');
-    console.log('✓ Connected to PostgreSQL Database via Prisma');
-    console.log(`✓ Server running at http://localhost:${PORT}`);
-    console.log(`✓ Health Check: http://localhost:${PORT}/api/health`);
-    console.log(`✓ Tasks API: http://localhost:${PORT}/api/tasks`);
-    console.log('------------------------------------------------------------');
 
-    const server = app.listen(PORT);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log('------------------------------------------------------------');
+      console.log('🏢 THYO SOFTECH PVT LTD - HRMS TASK MANAGEMENT SYSTEM');
+      console.log('✓ Connected to PostgreSQL Database via Prisma');
+      console.log(`✓ Server running at http://localhost:${PORT}`);
+      console.log(`✓ Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`✓ Tasks API: http://localhost:${PORT}/api/tasks`);
+      console.log('------------------------------------------------------------');
+      warmUpCaches();
+    });
 
     // Graceful shutdown handling
     const shutdown = async (signal) => {

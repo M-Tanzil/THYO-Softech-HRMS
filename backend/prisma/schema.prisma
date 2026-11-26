@@ -1,10 +1,762 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(EMPLOYEE)
+  isActive     Boolean   @default(true)
+  employeeId   String?   @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  employee     Employee? @relation(fields: [employeeId], references: [employeeId])
+
+  @@index([username])
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Employee {
+  id          String   @id @default(uuid())
+  employeeId  String   @unique
+  fullName    String
+  email       String   @unique
+  phone       String?
+  department  String
+  designation String
+  position    String
+  status      String   @default("ACTIVE")
+  joiningDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Shared Relations
+  notifications Notification[]
+  assignments   TaskAssignment[]
+  comments      TaskComment[]
+  historyLogs   TaskHistory[]
+  user          User?
+
+  // Student 5 Relations
+  wfhRequests            WfhRequest[]            @relation("EmployeeWfhRequests")
+  wfhApproved            WfhRequest[]            @relation("ApproverWfhRequests")
+  performanceReviews     PerformanceReview[]     @relation("EmployeeReviews")
+  performanceReviewed    PerformanceReview[]     @relation("ReviewerReviews")
+  performanceGoals       PerformanceGoal[]
+  feedbacksGiven         PerformanceFeedback[]   @relation("FeedbackGiven")
+  feedbacksReceived      PerformanceFeedback[]   @relation("FeedbackReceived")
+  interviews             Interview[]
+  hiredApplications      JobApplication[]        @relation("HiredEmployee")
+  jobPostingsCreated     JobPosting[]
+  announcementsCreated   Announcement[]
+  notificationPreference NotificationPreference?
+  leaveRequests          LeaveRequest[]          @relation("EmployeeLeaveRequests")
+  leaveApprovals         LeaveApproval[]         @relation("ApproverLeaveActions")
+  leaveBalances          LeaveBalance[]
+
+  @@index([employeeId])
+  @@index([department])
+  @@index([position])
+  @@index([status])
+}
+
+model Task {
+  id             String           @id @default(uuid())
+  title          String
+  description    String
+  category       String           @default("General")
+  priority       Priority         @default(MEDIUM)
+  status         TaskStatus       @default(PENDING)
+  deadline       DateTime
+  estimatedHours Float            @default(0)
+  assignmentType AssignmentType   @default(INDIVIDUAL)
+  targetValue    String?
+  attachmentUrl  String?
+  tags           String?
+  createdBy      String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  assignments    TaskAssignment[]
+  comments       TaskComment[]
+  history        TaskHistory[]
+
+  @@index([priority])
+  @@index([status])
+  @@index([deadline])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([category])
+}
+
+model TaskAssignment {
+  id          String        @id @default(uuid())
+  taskId      String
+  employeeId  String
+  status      TaskStatus    @default(PENDING)
+  progress    Int           @default(0)
+  assignedAt  DateTime      @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime      @updatedAt
+  employee    Employee      @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  task        Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comments    TaskComment[]
+
+  @@unique([taskId, employeeId])
+  @@index([employeeId])
+  @@index([taskId])
+  @@index([status])
+}
+
+model TaskHistory {
+  id          String      @id @default(uuid())
+  taskId      String
+  employeeId  String?
+  action      String
+  oldStatus   TaskStatus?
+  newStatus   TaskStatus?
+  description String
+  createdAt   DateTime    @default(now())
+  employee    Employee?   @relation(fields: [employeeId], references: [employeeId])
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([createdAt])
+}
+
+model TaskComment {
+  id               String          @id @default(uuid())
+  taskId           String
+  taskAssignmentId String?
+  employeeId       String
+  authorName       String
+  comment          String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  employee         Employee        @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  assignment       TaskAssignment? @relation(fields: [taskAssignmentId], references: [id])
+  task             Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([employeeId])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: NOTIFICATIONS & CENTRAL NOTIFICATION INFRASTRUCTURE
+// ============================================================================
+
+model Notification {
+  id          String    @id @default(uuid())
+  recipientId String
+  title       String
+  message     String    @db.Text
+  timestamp   String?
+  read        Boolean   @default(false)
+  isRead      Boolean   @default(false)
+  type        String    @default("recruitment") // recruitment, performance, wfh, announcement, system, INFO, SUCCESS, WARNING, ACTION_REQUIRED
+  category    String    @default("Recruitment") // Recruitment, Performance, WFH, Announcements, Holidays, SYSTEM
+  actionLink  String?
+  targetTab   String?
+  entityType  String? // TASK, WFH_REQUEST, PERFORMANCE_REVIEW, JOB_APPLICATION, ANNOUNCEMENT, LEAVE, PAYROLL
+  entityId    String?
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  employee    Employee  @relation(fields: [recipientId], references: [employeeId], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([isRead])
+  @@index([recipientId, isRead])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id                 String   @id @default(uuid())
+  employeeId         String   @unique
+  emailAlerts        Boolean  @default(true)
+  wfhAlerts          Boolean  @default(true)
+  recruitmentAlerts  Boolean  @default(true)
+  performanceAlerts  Boolean  @default(true)
+  taskAlerts         Boolean  @default(true)
+  announcementAlerts Boolean  @default(true)
+  payrollAlerts      Boolean  @default(true)
+  leaveAlerts        Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+  employee           Employee @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+
+  @@index([employeeId])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: ANNOUNCEMENTS & TARGETING
+// ============================================================================
+
+model Announcement {
+  id               String               @id @default(uuid())
+  title            String
+  message          String               @db.Text
+  content          String?              @db.Text
+  date             DateTime             @default(now())
+  author           String?
+  authorRole       String?
+  authorAvatar     String?
+  audience         String               @default("ALL") // Backward compatible: ALL, DEPARTMENT, POSITION, INDIVIDUAL
+  targetValue      String? // Backward compatible
+  targetDepartment String               @default("All Organization")
+  priority         String               @default("Normal") // Normal, High, Urgent
+  category         String               @default("Company Event") // Company Event, HR Policy, Holiday Notice, Recruitment, GENERAL, EMERGENCY
+  publishDate      DateTime             @default(now())
+  expiryDate       DateTime?
+  pinned           Boolean              @default(false)
+  acknowledgedBy   Json? // Array of employee IDs e.g. ["EMP001", "EMP002"]
+  createdById      String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  targets          AnnouncementTarget[]
+  authorEmployee   Employee?            @relation(fields: [createdById], references: [employeeId])
+
+  @@index([audience])
+  @@index([publishDate])
+  @@index([createdById])
+}
+
+model AnnouncementTarget {
+  id             String       @id @default(uuid())
+  announcementId String
+  targetType     String // ALL, BRANCH, DEPARTMENT, ROLE, EMPLOYEE_GROUP
+  targetValue    String? // Target value e.g. "IT", "Bangalore HQ", "MANAGER", "EMP001"
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, targetType, targetValue])
+  @@index([targetType])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: HOLIDAYS (COMPANY & BRANCH-SPECIFIC)
+// ============================================================================
+
+model Holiday {
+  id            String          @id @default(uuid())
+  name          String
+  date          DateTime
+  day           String?
+  year          Int
+  type          String          @default("National Holiday") // National Holiday, Gazetted Festival, Regional Festival, Optional
+  campus        String          @default("All Campuses")
+  description   String?         @db.Text
+  passed        Boolean         @default(false)
+  isNext        Boolean         @default(false)
+  isAllBranches Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  branches      HolidayBranch[]
+
+  @@index([date])
+  @@index([year])
+  @@index([isAllBranches])
+}
+
+model HolidayBranch {
+  id        String  @id @default(uuid())
+  holidayId String
+  branch    String // "Bangalore HQ", "Mumbai Regional Office", "Delhi NCR Tech Center", "Bhubaneswar Development Center"
+  holiday   Holiday @relation(fields: [holidayId], references: [id], onDelete: Cascade)
+
+  @@unique([holidayId, branch])
+  @@index([branch])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: WORK FROM HOME (WFH)
+// ============================================================================
+
+model WfhRequest {
+  id                 String    @id @default(uuid())
+  employeeId         String
+  employeeName       String?
+  employeeRole       String?
+  department         String?
+  startDate          DateTime
+  endDate            DateTime
+  daysCount          Float     @default(1.0)
+  days               Float     @default(1.0)
+  reason             String    @db.Text
+  remarks            String?   @db.Text
+  contactNumber      String?
+  equipmentConfirmed Boolean   @default(true)
+  vpnSecured         Boolean   @default(true)
+  tasksPlanned       String?   @db.Text
+  status             String    @default("Pending") // Pending, Approved, Rejected, Cancelled
+  approvedBy         String?
+  approverId         String?
+  approverNote       String?   @db.Text
+  rejectionReason    String?   @db.Text
+  appliedDate        DateTime  @default(now())
+  approvedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  employee Employee  @relation("EmployeeWfhRequests", fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  approver Employee? @relation("ApproverWfhRequests", fields: [approverId], references: [employeeId])
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate])
+  @@index([appliedDate])
+  @@index([department])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: PERFORMANCE MANAGEMENT
+// ============================================================================
+
+model PerformanceCycle {
+  id                    String              @id @default(uuid())
+  title                 String // e.g. "Annual Appraisal Cycle 2026", "Q3 Performance Review"
+  name                  String? // Prototype display name
+  cycleType             String              @default("ANNUAL") // QUARTERLY, HALF_YEARLY, ANNUAL, Quarterly, Mid-Year, Annual
+  type                  String? // Prototype display type
+  startDate             DateTime
+  endDate               DateTime
+  reviewDeadline        DateTime?
+  status                String              @default("Active") // Upcoming, Active, Closed, IN_REVIEW, COMPLETED
+  description           String?             @db.Text
+  participantsCount     Int                 @default(0)
+  completedReviewsCount Int                 @default(0)
+  pendingReviewsCount   Int                 @default(0)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  reviews               PerformanceReview[]
+  goals                 PerformanceGoal[]
+
+  @@index([status])
+}
+
+model PerformanceGoal {
+  id                  String    @id @default(uuid())
+  cycleId             String?
+  employeeId          String
+  employeeName        String?
+  department          String?
+  title               String
+  description         String?   @db.Text
+  category            String    @default("OPERATIONAL") // TECHNICAL, LEADERSHIP, OPERATIONAL, INNOVATION, SOFT_SKILLS
+  target              String?
+  targetMetric        String? // e.g. "Deliver 5 modules", "99.9% uptime"
+  currentProgress     Int       @default(0) // 0-100%
+  progress            Int       @default(0) // 0-100%
+  weightage           Int       @default(20) // Percentage weight in appraisal
+  status              String    @default("On Track") // On Track, In Progress, At Risk, Completed
+  dueDate             DateTime?
+  factualProgressNote String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  cycle    PerformanceCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  employee Employee          @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([cycleId])
+  @@index([status])
+}
+
+model PerformanceReview {
+  id              String    @id @default(uuid())
+  cycleId         String
+  employeeId      String
+  reviewerId      String?
+  employeeName    String?
+  employeeRole    String?
+  department      String?
+  cycleName       String?
+  selfRating      Float? // 1.0 - 5.0
+  managerRating   Float? // 1.0 - 5.0
+  finalScore      Float? // 1.0 - 5.0
+  overallRating   Float? // 1.0 - 5.0
+  competencies    Json? // { technical: 5, delivery: 5, ownership: 5, communication: 4, teamwork: 5 }
+  selfAssessment  String?   @db.Text
+  managerFeedback String?   @db.Text
+  managerComments String?   @db.Text
+  strengths       String?   @db.Text
+  improvements    String?   @db.Text
+  status          String    @default("Self-Review Pending") // Self-Review Pending, Manager Review Pending, Completed, DRAFT, SUBMITTED, REVIEWED, ACKNOWLEDGED
+  completionDate  DateTime?
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  acknowledgedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  cycle    PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employee Employee         @relation("EmployeeReviews", fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  reviewer Employee?        @relation("ReviewerReviews", fields: [reviewerId], references: [employeeId])
+
+  @@unique([cycleId, employeeId])
+  @@index([employeeId])
+  @@index([reviewerId])
+  @@index([status])
+}
+
+model PerformanceFeedback {
+  id               String   @id @default(uuid())
+  toEmployeeId     String
+  toEmployeeName   String?
+  toRole           String?
+  fromEmployeeId   String
+  fromEmployeeName String?
+  fromRole         String?
+  feedbackType     String   @default("Praise / Kudos") // Praise / Kudos, Constructive Coaching, 1-on-1 Milestone
+  badge            String // Code Ninja ⚡, Design Champion 🎨, Bug Hunter 🛡️, Reliability Hero 🚀, Team Mentor 🌟
+  message          String   @db.Text
+  likes            Int      @default(0)
+  date             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  toEmployee   Employee @relation("FeedbackReceived", fields: [toEmployeeId], references: [employeeId], onDelete: Cascade)
+  fromEmployee Employee @relation("FeedbackGiven", fields: [fromEmployeeId], references: [employeeId], onDelete: Cascade)
+
+  @@index([toEmployeeId])
+  @@index([fromEmployeeId])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: RECRUITMENT / ATS
+// 9-Stage Flow: Requisition → Posting → Candidate → Application → Screening → Interview → Offer → Hiring → Employee
+// ============================================================================
+
+model JobRequisition {
+  id                 String      @id
+  title              String
+  department         String
+  openings           Int         @default(1)
+  priority           String      @default("Medium") // Urgent, High, Medium, Low
+  targetDate         DateTime?
+  budgetSalaryRange  String?
+  reason             String?     @db.Text
+  requestedBy        String
+  status             String      @default("Pending Approval") // Draft, Pending Approval, Approved, Rejected
+  approvedBy         String?
+  rejectionReason    String?     @db.Text
+  convertedPostingId String?
+  createdDate        DateTime    @default(now())
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  jobPosting         JobPosting?
+
+  @@index([status])
+  @@index([department])
+}
+
+model JobPosting {
+  id            String           @id @default(uuid())
+  requisitionId String?          @unique // e.g. "REQ-01"
+  requisition   JobRequisition?  @relation(fields: [requisitionId], references: [id])
+  title         String
+  department    String
+  branch        String           @default("Bangalore HQ")
+  position      String
+  jobType       String           @default("FULL_TIME") // FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP
+  type          String? // e.g. "Full-Time"
+  experience    String // e.g. "2-5 years"
+  location      String?
+  openings      Int              @default(1)
+  salaryRange   String? // e.g. "₹8,00,000 - ₹14,00,000"
+  description   String           @db.Text
+  requirements  String           @db.Text
+  status        String           @default("Active") // Active, Draft, Open, On Hold, Closed
+  isPublished   Boolean          @default(true)
+  postedDate    DateTime         @default(now())
+  postedById    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  applications  JobApplication[]
+  postedBy      Employee?        @relation(fields: [postedById], references: [employeeId])
+
+  @@index([status])
+  @@index([department])
+  @@index([branch])
+}
+
+model Candidate {
+  id                  String               @id @default(uuid())
+  fullName            String
+  email               String               @unique
+  phone               String
+  location            String?
+  linkedin            String?
+  portfolio           String?
+  jobId               String?
+  jobTitle            String?
+  department          String?
+  currentRole         String?
+  currentOrg          String?
+  currentCompany      String?
+  currentSalary       String?
+  expectedSalary      String?
+  noticePeriod        String?
+  totalExpYears       Float?               @default(0)
+  skills              String?
+  stage               String               @default("Applied") // Applied, Screening, Interview, Offered, Hired, Rejected
+  rating              Float?               @default(4.5)
+  appliedDate         DateTime             @default(now())
+  resumeUrl           String?
+  summary             String?              @db.Text
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  applications        JobApplication[]
+  screeningScorecards ScreeningScorecard[]
+
+  @@index([email])
+  @@index([stage])
+}
+
+model JobApplication {
+  id              String    @id @default(uuid())
+  jobPostingId    String
+  candidateId     String
+  status          String    @default("Applied") // Applied, Screening, Interview, Offered, Hired, Rejected
+  screeningStatus String    @default("Pending") // Pending, In Progress, Passed, Failed
+  interviewStatus String    @default("Not Scheduled") // Not Scheduled, Scheduled, Completed, Cancelled
+  offerStatus     String    @default("Not Initiated") // Not Initiated, Sent, Accepted, Rejected
+  stageNotes      String?   @db.Text
+  rating          Float? // 1-5 rating
+  appliedDate     DateTime  @default(now())
+  hiredAt         DateTime?
+  hiredEmployeeId String?   @unique // References Employee.employeeId once hired!
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  jobPosting          JobPosting           @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+  candidate           Candidate            @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  hiredEmployee       Employee?            @relation("HiredEmployee", fields: [hiredEmployeeId], references: [employeeId])
+  interviews          Interview[]
+  offer               JobOffer?
+  screeningScorecards ScreeningScorecard[]
+
+  @@unique([jobPostingId, candidateId])
+  @@index([status])
+  @@index([jobPostingId])
+  @@index([candidateId])
+  @@index([appliedDate])
+}
+
+model ScreeningScorecard {
+  id             String   @id @default(uuid())
+  applicationId  String?
+  candidateId    String
+  reviewer       String
+  screenDate     DateTime @default(now())
+  techFit        Int      @default(3)
+  communication  Int      @default(3)
+  cultureFit     Int      @default(3)
+  salaryFit      Int      @default(3)
+  experienceFit  Int      @default(3)
+  recommendation String // "Move to Interview", "Reject", "On Hold"
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  application JobApplication? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidate   Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model Interview {
+  id              String   @id @default(uuid())
+  applicationId   String
+  interviewerId   String?
+  candidateId     String?
+  candidateName   String?
+  candidateEmail  String?
+  jobTitle        String?
+  roundName       String // "Technical Round 1", "Managerial Round", "HR Round"
+  interviewDate   DateTime
+  time            String?
+  durationMinutes Int      @default(45)
+  duration        String?
+  mode            String   @default("ONLINE") // ONLINE, IN_PERSON, PHONE
+  interviewType   String   @default("Video Call")
+  meetingLink     String?
+  status          String   @default("Scheduled") // Scheduled, Completed, Cancelled, Rescheduled
+  feedback        String?  @db.Text
+  score           Float? // 1-10
+  rating          Float? // 1-5
+  recommendation  String? // Strong Hire, Hire, Hold, Reject
+  interviewer     String?
+  interviewerRole String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  application    JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewerEmp Employee?      @relation(fields: [interviewerId], references: [employeeId])
+
+  @@index([applicationId])
+  @@index([interviewerId])
+  @@index([status])
+  @@index([interviewDate])
+}
+
+model JobOffer {
+  id               String   @id @default(uuid())
+  applicationId    String   @unique
+  candidateId      String?
+  candidateName    String?
+  candidateEmail   String?
+  position         String?
+  offeredSalary    String // e.g. "₹12,00,000 per annum"
+  salaryCTC        String?
+  fixedSalary      String?
+  variableBonus    String?
+  reportingManager String?
+  designation      String
+  department       String
+  branch           String
+  location         String?
+  offerDate        DateTime @default(now())
+  joiningDate      DateTime
+  status           String   @default("Sent") // Sent, Accepted, Rejected, Withdrawn
+  terms            String?  @db.Text
+  rejectionReason  String?  @db.Text
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ============================================================================
+// STUDENT 5 MODULE: LEAVE MANAGEMENT
+// Models: LeaveType, LeaveBalance, LeaveRequest, LeaveApproval
+// ============================================================================
+
+model LeaveType {
+  id              String   @id @default(uuid())
+  code            String   @unique // "CL", "SL", "PL", "ML", "PAT", "COMP", "UNPAID"
+  name            String // "Casual Leave", "Sick Leave", "Earned Leave", etc.
+  description     String?  @db.Text
+  defaultDays     Float    @default(12.0)
+  isPaid          Boolean  @default(true)
+  carryForward    Boolean  @default(false)
+  maxCarryForward Float    @default(0.0)
+  requiresProof   Boolean  @default(false)
+  status          String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  balances LeaveBalance[]
+  requests LeaveRequest[]
+
+  @@index([code])
+  @@index([status])
+}
+
+model LeaveBalance {
+  id             String   @id @default(uuid())
+  employeeId     String
+  leaveTypeId    String
+  year           Int      @default(2026)
+  allocated      Float    @default(12.0)
+  used           Float    @default(0.0)
+  pending        Float    @default(0.0)
+  carriedForward Float    @default(0.0)
+  total          Float    @default(12.0)
+  remaining      Float    @default(12.0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  employee  Employee  @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([employeeId])
+  @@index([leaveTypeId])
+  @@index([year])
+}
+
+model LeaveRequest {
+  id              String   @id @default(uuid())
+  employeeId      String
+  leaveTypeId     String
+  startDate       DateTime
+  endDate         DateTime
+  daysCount       Float    @default(1.0)
+  isHalfDay       Boolean  @default(false)
+  halfDaySession  String? // "FIRST_HALF", "SECOND_HALF"
+  reason          String   @db.Text
+  documentUrl     String?
+  contactNumber   String?
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  rejectionReason String?  @db.Text
+  appliedDate     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employee  Employee        @relation("EmployeeLeaveRequests", fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  leaveType LeaveType       @relation(fields: [leaveTypeId], references: [id])
+  approvals LeaveApproval[]
+
+  @@index([employeeId])
+  @@index([leaveTypeId])
+  @@index([status])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([appliedDate])
+}
+
+model LeaveApproval {
+  id             String    @id @default(uuid())
+  leaveRequestId String
+  approverId     String
+  approverRole   String? // "MANAGER", "ADMIN"
+  status         String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  comments       String?   @db.Text
+  actionDate     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  approver     Employee     @relation("ApproverLeaveActions", fields: [approverId], references: [employeeId])
+
+  @@index([leaveRequestId])
+  @@index([approverId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  employeeId String?
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
 }
 
 enum Priority {
@@ -29,143 +781,4 @@ enum AssignmentType {
   DEPARTMENT
   POSITION
   ALL
-}
-
-// Development employee model - ready to be mapped to the team's central User/Employee model during integration
-model Employee {
-  id          String   @id @default(uuid())
-  employeeId  String   @unique // EMP001, EMP002, etc.
-  fullName    String
-  email       String   @unique
-  phone       String?
-  department  String   // IT, HR, Sales, Operations
-  designation String   // Senior Software Engineer, HR Executive, etc.
-  position    String   // Software Developer, HR Executive, etc.
-  status      String   @default("ACTIVE")
-  joiningDate DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  assignments   TaskAssignment[]
-  comments      TaskComment[]
-  historyLogs   TaskHistory[]
-  notifications Notification[]
-
-  @@index([employeeId])
-  @@index([department])
-  @@index([position])
-}
-
-model Task {
-  id             String         @id @default(uuid())
-  title          String
-  description    String         @db.Text
-  category       String         @default("General")
-  priority       Priority       @default(MEDIUM)
-  status         TaskStatus     @default(PENDING)
-  deadline       DateTime
-  estimatedHours Float          @default(0)
-  assignmentType AssignmentType @default(INDIVIDUAL)
-  targetValue    String?
-  attachmentUrl  String?
-  tags           String?
-  createdBy      String         // EMP001 or "Admin"
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  assignments TaskAssignment[]
-  comments    TaskComment[]
-  history     TaskHistory[]
-
-  @@index([priority])
-  @@index([status])
-  @@index([deadline])
-  @@index([createdBy])
-}
-
-model TaskAssignment {
-  id          String     @id @default(uuid())
-  taskId      String
-  employeeId  String
-  status      TaskStatus @default(PENDING)
-  progress    Int        @default(0) // 0, 25, 50, 75, 100
-  assignedAt  DateTime   @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  updatedAt   DateTime   @updatedAt
-
-  task     Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee Employee      @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
-  comments TaskComment[]
-
-  @@unique([taskId, employeeId])
-  @@index([employeeId])
-  @@index([status])
-}
-
-model TaskHistory {
-  id          String      @id @default(uuid())
-  taskId      String
-  employeeId  String?
-  action      String
-  oldStatus   TaskStatus?
-  newStatus   TaskStatus?
-  description String
-  createdAt   DateTime    @default(now())
-
-  task     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee Employee? @relation(fields: [employeeId], references: [employeeId], onDelete: SetNull)
-
-  @@index([taskId])
-  @@index([createdAt])
-}
-
-model TaskComment {
-  id               String   @id @default(uuid())
-  taskId           String
-  taskAssignmentId String?
-  employeeId       String
-  authorName       String
-  comment          String   @db.Text
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee   Employee        @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
-  assignment TaskAssignment? @relation(fields: [taskAssignmentId], references: [id], onDelete: SetNull)
-
-  @@index([taskId])
-  @@index([employeeId])
-}
-
-model Notification {
-  id          String   @id @default(uuid())
-  recipientId String
-  title       String
-  message     String   @db.Text
-  type        String   @default("INFO")
-  link        String?
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  employee Employee @relation(fields: [recipientId], references: [employeeId], onDelete: Cascade)
-
-  @@index([recipientId])
-  @@index([isRead])
-}
-
-model Announcement {
-  id          String    @id @default(uuid())
-  title       String
-  message     String    @db.Text
-  audience    String    @default("ALL")
-  targetValue String?
-  publishDate DateTime  @default(now())
-  expiryDate  DateTime?
-  createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([audience])
-  @@index([publishDate])
 }

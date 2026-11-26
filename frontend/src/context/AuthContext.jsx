@@ -1,102 +1,226 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient from '../api/client';
+import { clearPersistedQueryCache } from '../main';
 
 const AuthContext = createContext(null);
 
+export const getDashboardRoute = (role) => {
+  const normRole = String(role || 'EMPLOYEE').toUpperCase();
+  if (normRole === 'ADMIN') return '/leave?tab=approvalQueue';
+  if (normRole === 'MANAGER') return '/leave?tab=approvalQueue';
+  return '/leave?tab=my';
+};
+
 export const AuthProvider = ({ children }) => {
-  const [employees, setEmployees] = useState([]);
-  const [activeEmpId, setActiveEmpId] = useState(
-    localStorage.getItem('thyo_active_emp_id') || 'EMP001'
-  );
-  const [activeRole, setActiveRole] = useState(
-    localStorage.getItem('thyo_active_role') || 'ADMIN'
-  );
-  const [currentUser, setCurrentUser] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(() => {
+    return (
+      localStorage.getItem('thyo_task_token') ||
+      localStorage.getItem('thyo_auth_token') ||
+      localStorage.getItem('token') ||
+      null
+    );
+  });
 
-  // Fetch employees list from backend
-  const fetchEmployees = async () => {
+  const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const res = await apiClient.get('/employees');
-      if (res.data && res.data.success) {
-        setEmployees(res.data.data);
-        const current = res.data.data.find(e => e.employeeId === activeEmpId);
-        if (current) {
-          setCurrentUser(current);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch employees in AuthContext:', err.friendlyMessage || err.message);
-    } finally {
-      setLoading(false);
+      const saved =
+        localStorage.getItem('thyo_user_data') ||
+        localStorage.getItem('user') ||
+        localStorage.getItem('currentUser') ||
+        localStorage.getItem('auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
     }
-  };
+  });
 
-  // Fetch unread notifications count
-  const refreshNotificationsCount = async () => {
+  const [loading, setLoading] = useState(() => {
+    const savedToken =
+      localStorage.getItem('thyo_task_token') ||
+      localStorage.getItem('thyo_auth_token') ||
+      localStorage.getItem('token');
+    const savedUser =
+      localStorage.getItem('thyo_user_data') ||
+      localStorage.getItem('user') ||
+      localStorage.getItem('currentUser') ||
+      localStorage.getItem('auth_user');
+    return Boolean(savedToken && !savedUser);
+  });
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshNotificationsCount = useCallback(async () => {
     try {
-      const res = await apiClient.get('/notifications?limit=1');
+      const res = await apiClient.get('/notifications/unread-count');
       if (res.data && res.data.success) {
         setUnreadCount(res.data.unreadCount || 0);
       }
-    } catch (err) {
-      // Silently catch in development
+    } catch {
+      // Silently ignore if unauthenticated or offline
     }
-  };
+  }, []);
+
+  const initAuth = useCallback(async () => {
+    const savedToken =
+      localStorage.getItem('thyo_task_token') ||
+      localStorage.getItem('thyo_auth_token') ||
+      localStorage.getItem('token');
+    const savedUser =
+      localStorage.getItem('thyo_user_data') ||
+      localStorage.getItem('user') ||
+      localStorage.getItem('currentUser') ||
+      localStorage.getItem('auth_user');
+
+    if (!savedUser && savedToken) {
+      setLoading(true);
+    }
+
+    try {
+      if (savedToken) {
+        try {
+          const res = await apiClient.get('/auth/me');
+          if (res.data && res.data.success && res.data.user) {
+            const u = res.data.user;
+            let role = String(u.role || 'EMPLOYEE').toUpperCase();
+            if (!['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(role)) {
+              role = 'EMPLOYEE';
+            }
+            const normalizedUser = { ...u, role };
+            localStorage.setItem('thyo_user_data', JSON.stringify(normalizedUser));
+            setCurrentUser((prev) => {
+              if (prev && prev.employeeId === normalizedUser.employeeId && prev.role === normalizedUser.role && prev.email === normalizedUser.email && prev.fullName === normalizedUser.fullName) {
+                return prev;
+              }
+              return normalizedUser;
+            });
+            setToken(savedToken);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          if (err.response && err.response.status === 401) {
+            localStorage.removeItem('thyo_task_token');
+            localStorage.removeItem('thyo_auth_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('thyo_user_data');
+            setToken(null);
+            setCurrentUser(null);
+          }
+        }
+      } else {
+        setCurrentUser(null);
+        setToken(null);
+      }
+    } catch (err) {
+      console.error('Error during auth initialization:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [activeEmpId]);
+    initAuth();
+  }, [initAuth]);
+
+  const currentEmployeeId = currentUser?.employeeId;
 
   useEffect(() => {
-    if (activeEmpId) {
+    if (currentEmployeeId) {
       refreshNotificationsCount();
     }
-  }, [activeEmpId, activeRole]);
+  }, [currentEmployeeId, refreshNotificationsCount]);
 
-  // Switcher to simulate different employee identities without fake passwords
-  const switchUser = (empId, role = null) => {
-    let determinedRole = role;
-    if (!determinedRole) {
-      if (empId === 'EMP001') determinedRole = 'ADMIN';
-      else if (empId === 'EMP002') determinedRole = 'HR';
-      else determinedRole = 'EMPLOYEE';
+  const login = useCallback(async ({ identifier, username, email, password }) => {
+    const loginPayload = {
+      identifier: identifier || username || email,
+      password
+    };
+
+    const res = await apiClient.post('/auth/login', loginPayload);
+    if (res.data && res.data.success) {
+      const { token: receivedToken, user: receivedUser } = res.data;
+      let role = String(receivedUser.role || 'EMPLOYEE').toUpperCase();
+      if (!['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(role)) {
+        role = 'EMPLOYEE';
+      }
+      const normalizedUser = { ...receivedUser, role };
+
+      clearPersistedQueryCache();
+      localStorage.setItem('thyo_task_token', receivedToken);
+      localStorage.setItem('thyo_auth_token', receivedToken);
+      localStorage.setItem('token', receivedToken);
+      localStorage.setItem('thyo_user_data', JSON.stringify(normalizedUser));
+      setToken(receivedToken);
+      setCurrentUser(normalizedUser);
+      return { success: true, user: normalizedUser };
     }
+    throw new Error(res.data?.message || 'Authentication failed.');
+  }, []);
 
-    setActiveEmpId(empId);
-    setActiveRole(determinedRole);
-    localStorage.setItem('thyo_active_emp_id', empId);
-    localStorage.setItem('thyo_active_role', determinedRole);
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch {
+      // Proceed with local logout regardless of server state
+    } finally {
+      clearPersistedQueryCache();
+      localStorage.removeItem('thyo_task_token');
+      localStorage.removeItem('thyo_auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('thyo_user_data');
+      localStorage.removeItem('thyo_active_emp_id');
+      localStorage.removeItem('thyo_active_role');
+      localStorage.removeItem('thyo_dev_dashboard_role');
+      setToken(null);
+      setCurrentUser(null);
+      setUnreadCount(0);
+    }
+  }, []);
 
-    const emp = employees.find(e => e.employeeId === empId);
-    if (emp) setCurrentUser(emp);
-  };
+  const verifiedRole = (currentUser?.role || 'EMPLOYEE').toUpperCase();
+  const isAuthenticated = !!currentUser;
+  const isAdmin = verifiedRole === 'ADMIN';
+  const isManager = verifiedRole === 'MANAGER';
+  const isEmployee = verifiedRole === 'EMPLOYEE';
+  const isManagerOrAdmin = isAdmin || isManager;
 
-  const isManagerOrAdmin = ['ADMIN', 'SUPER_ADMIN', 'HR', 'MANAGER'].includes(
-    (activeRole || 'EMPLOYEE').toUpperCase()
-  );
+  const value = useMemo(() => ({
+    token,
+    currentUser,
+    user: currentUser,
+    isAuthenticated,
+    loading,
+    activeRole: verifiedRole,
+    activeEmpId: currentUser?.employeeId || null,
+    isManagerOrAdmin,
+    isAdmin,
+    isManager,
+    isEmployee,
+    isSuperAdmin: false,
+    isHR: false,
+    login,
+    logout,
+    unreadCount,
+    refreshNotificationsCount,
+    getDashboardRoute
+  }), [
+    token,
+    currentUser,
+    isAuthenticated,
+    loading,
+    verifiedRole,
+    isManagerOrAdmin,
+    isAdmin,
+    isManager,
+    isEmployee,
+    login,
+    logout,
+    unreadCount,
+    refreshNotificationsCount
+  ]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        employees,
-        activeEmpId,
-        activeRole,
-        isManagerOrAdmin,
-        currentUser: currentUser || {
-          employeeId: activeEmpId,
-          fullName: activeEmpId === 'EMP001' ? 'RUPAM BHARGOV' : activeEmpId,
-          role: activeRole,
-          department: 'IT',
-          position: 'Software Developer'
-        },
-        unreadCount,
-        switchUser,
-        refreshNotificationsCount,
-        loading
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -109,3 +233,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;

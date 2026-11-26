@@ -3,7 +3,8 @@ const announcementService = require('../services/announcementService');
 class AnnouncementController {
   async createAnnouncement(req, res, next) {
     try {
-      const announcement = await announcementService.createAnnouncement(req.body, req.user);
+      const data = req.validatedData || req.body;
+      const announcement = await announcementService.createAnnouncement(data, req.user);
       res.status(201).json({
         success: true,
         message: 'Announcement published successfully.',
@@ -20,6 +21,20 @@ class AnnouncementController {
       res.status(200).json({
         success: true,
         data: announcements
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async acknowledgeAnnouncement(req, res, next) {
+    try {
+      const employeeId = req.user.employeeId;
+      const updated = await announcementService.acknowledgeAnnouncement(req.params.id, employeeId);
+      res.status(200).json({
+        success: true,
+        message: 'Announcement acknowledged successfully.',
+        data: updated
       });
     } catch (error) {
       next(error);

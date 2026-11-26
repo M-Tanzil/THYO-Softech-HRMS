@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import apiClient from '../../api/client';
 import TaskForm from '../../components/tasks/TaskForm';
+import { SkeletonCard } from '../../components/common/SkeletonLoader';
 
 export default function EditTaskPage() {
   const { id } = useParams();
@@ -29,8 +30,8 @@ export default function EditTaskPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-16 text-center text-sm text-slate-400">
-        Loading task details...
+      <div className="max-w-4xl mx-auto space-y-6">
+        <SkeletonCard count={2} />
       </div>
     );
   }
@@ -48,19 +49,19 @@ export default function EditTaskPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg border border-slate-200 shadow-2xs transition-colors"
+          className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-white rounded-lg border border-[#E2E8F0] shadow-2xs transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Link to="/tasks" className="hover:text-sky-600">Tasks</Link>
+          <div className="flex items-center gap-2 text-xs text-[#64748B]">
+            <Link to="/tasks" className="hover:text-[#0084FF]">Tasks</Link>
             <span>/</span>
-            <Link to={`/tasks/${id}`} className="hover:text-sky-600">{task.title}</Link>
+            <Link to={`/tasks/${id}`} className="hover:text-[#0084FF]">{task.title}</Link>
             <span>/</span>
-            <span className="text-slate-600 font-medium">Edit</span>
+            <span className="text-[#0F172A] font-medium">Edit</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-xl font-bold text-[#0F172A] tracking-tight">
             Edit Task: {task.title}
           </h2>
         </div>

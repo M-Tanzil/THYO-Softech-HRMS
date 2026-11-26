@@ -1,64 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Megaphone, Plus } from 'lucide-react';
 import apiClient from '../api/client';
 import AnnouncementCard from '../components/announcements/AnnouncementCard';
 import AnnouncementModal from '../components/announcements/AnnouncementModal';
 import { useAuth } from '../context/AuthContext';
+import { SkeletonCard } from '../components/common/SkeletonLoader';
 
 export default function AnnouncementsPage() {
-  const { activeRole } = useAuth();
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { activeRole, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    try {
+  const {
+    data: announcements = [],
+    isLoading: loading,
+    refetch: fetchAnnouncements
+  } = useQuery({
+    queryKey: ['announcements'],
+    queryFn: async () => {
       const res = await apiClient.get('/announcements');
       if (res.data.success) {
-        setAnnouncements(res.data.data);
+        return res.data.data;
       }
-    } catch (err) {
-      console.error('Failed to load announcements:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAnnouncements();
-  }, []);
+      return [];
+    },
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    placeholderData: (prev) => prev
+  });
 
   const handleCreated = (newAnn) => {
-    setAnnouncements(prev => [newAnn, ...prev]);
+    queryClient.invalidateQueries({ queryKey: ['announcements'] });
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this announcement?')) return;
     try {
       await apiClient.delete(`/announcements/${id}`);
-      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
     } catch (err) {
       alert(err.friendlyMessage || 'Failed to delete announcement.');
+    }
+  };
+
+  const handleAcknowledge = async (id) => {
+    try {
+      await apiClient.post(`/announcements/${id}/acknowledge`);
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+    } catch (err) {
+      alert(err.friendlyMessage || 'Failed to acknowledge announcement.');
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Company Announcements
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Official communications, policy updates, and project directives across THYO SOFTECH PVT LTD.
-          </p>
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+            <Megaphone className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Company Announcements
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Official communications, policy updates, and project directives across THYO SOFTECH PVT LTD.
+            </p>
+          </div>
         </div>
 
-        {activeRole === 'ADMIN' && (
+        {isAdmin && (
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+            className="thyo-btn-primary"
           >
             <Plus className="w-4 h-4" />
             <span>Publish Announcement</span>
@@ -67,15 +81,13 @@ export default function AnnouncementsPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center text-sm text-slate-400">
-          Loading company announcements...
-        </div>
+        <SkeletonCard count={3} />
       ) : announcements.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+        <div className="thyo-card p-12 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-3 text-indigo-600">
             <Megaphone className="w-6 h-6" />
           </div>
-          <h4 className="text-sm font-semibold text-slate-800 mb-1">No active announcements</h4>
+          <h4 className="text-sm font-semibold text-slate-900 mb-1">No active announcements</h4>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             There are currently no company-wide announcements published.
           </p>
@@ -87,7 +99,8 @@ export default function AnnouncementsPage() {
               key={ann.id}
               announcement={ann}
               onDelete={handleDelete}
-              canDelete={activeRole === 'ADMIN'}
+              onAcknowledge={handleAcknowledge}
+              canDelete={isAdmin}
             />
           ))}
         </div>

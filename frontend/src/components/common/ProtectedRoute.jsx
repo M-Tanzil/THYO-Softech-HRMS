@@ -1,38 +1,49 @@
 import React from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getDashboardRoute } from '../../context/AuthContext';
 
 export default function ProtectedRoute({ allowedRoles = [], children }) {
-  const { activeRole, currentUser } = useAuth();
+  const { currentUser, activeRole, loading } = useAuth();
 
-  const role = (activeRole || 'EMPLOYEE').toUpperCase();
-  const normalizedAllowed = allowedRoles.map(r => r.toUpperCase());
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-3 border-[#0084FF] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-[#64748B] font-medium">Verifying authorization...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Admins always have access
+  const role = (activeRole || currentUser?.role || 'EMPLOYEE').toUpperCase();
+  const normalizedAllowed = allowedRoles.map((r) => r.toUpperCase());
+
+  // Admins always have master supervisory access
   const isAuthorized =
+    normalizedAllowed.length === 0 ||
     role === 'ADMIN' ||
-    role === 'SUPER_ADMIN' ||
     normalizedAllowed.includes(role);
 
   if (!isAuthorized) {
     return (
-      <div className="bg-white rounded-xl border border-rose-200 p-8 sm:p-12 text-center max-w-xl mx-auto shadow-xs my-8">
-        <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
+      <div className="bg-white rounded-2xl border border-rose-200 p-8 sm:p-12 text-center max-w-xl mx-auto my-12 shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto mb-5 shadow-xs">
           <ShieldAlert className="w-7 h-7" />
         </div>
-        <h3 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h3>
-        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Your active role (<span className="font-semibold text-rose-700">{role}</span>) does not possess administrative permissions for this resource. This feature is strictly reserved for <span className="font-semibold text-slate-800">{allowedRoles.join(', ')}</span>.
+        <h3 className="text-xl font-bold text-[#0F172A] mb-2">Access Restricted</h3>
+        <p className="text-sm text-[#64748B] mb-6 leading-relaxed">
+          Your active role (<span className="font-semibold text-rose-700">{role}</span>) does not possess permission for this administrative action. This feature is restricted to <span className="font-semibold text-[#0F172A]">{allowedRoles.join(', ')}</span>.
         </p>
 
         <div className="flex items-center justify-center gap-3">
           <Link
-            to="/my-tasks"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+            to={getDashboardRoute(role)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0084FF] hover:bg-[#1C4ED8] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Go to My Assigned Tasks</span>
+            <span>Return to My Dashboard</span>
           </Link>
         </div>
       </div>
